@@ -170,6 +170,16 @@ python manage.py llm_check --model <把上一步看到的模型名填这里>
 失败对照：401/403 → Key 或权限；404 → base_url 少了 `/v1` 或模型名不存在；
 400 提到 `response_format` → 网关不完整支持 JSON 模式（已自动降级重试）；超时 → 调 `LLM_TIMEOUT_S`。
 
+## 本机常驻运行
+
+演示阶段用 Windows 计划任务跑（不占终端、开机登录即启），任务名 `Competitor*`：
+
+```
+Get-ScheduledTask -TaskName "Competitor*" | Select TaskName, State
+```
+
+细节（含日志坑、取消定时关机）见 [`docs/常驻运行.md`](docs/常驻运行.md)。
+
 ## 生产部署
 
 ```bash
