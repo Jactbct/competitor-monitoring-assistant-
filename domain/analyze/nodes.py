@@ -166,6 +166,32 @@ def n1_extract_promos(
     )
 
 
+#: 模型偶尔会把「事件类型」填进 kind 字段。这是提示词歧义导致的**形状相同、语义不同**的错误，
+#: 只做明确同义映射，不做猜测：映射表外的值照样走失败降级。
+_KIND_ALIASES = {
+    "real_price": "B_promo",
+    "coupon_promo": "B_promo",
+    "price": "B_promo",
+    "promo": "B_promo",
+    "price_notice": "B_promo",
+    "info": "A_info",
+    "fact": "A_info",
+    "creative": "C_creative",
+    "sku_change": "A_info",
+    "page_change": "A_info",
+}
+
+
+def _normalize_kind(data: dict) -> tuple[dict, str | None]:
+    kind = data.get("kind")
+    if not isinstance(kind, str):
+        return data, None
+    mapped = _KIND_ALIASES.get(kind.strip().lower())
+    if mapped is None or mapped == kind:
+        return data, None
+    return {**data, "kind": mapped}, f"kind {kind} → {mapped}"
+
+
 def n2_analyze(
     llm: LlmPort | None,
     *,
@@ -190,11 +216,20 @@ def n2_analyze(
                 cache_material=f"{cache_material}:a{attempt}",
                 tenant_id=tenant_id,
             )
-            parsed = AnalysisOutput.model_validate(result.data)
+            normalized, kind_note = _normalize_kind(dict(result.data))
+            parsed = AnalysisOutput.model_validate(normalized)
         except (ValidationError, ValueError, KeyError, TypeError) as exc:
             if attempt == 0:
                 continue
-            return N2Result(degraded=True, reason=f"schema 两次不合法：{type(exc).__name__}", meta={})
+            # 把「哪里不合法 + 模型原始输出」一起记下来：只说 ValidationError
+            # 的话，运维只能靠猜（实测这条信息能直接定位到是枚举值还是缺字段）
+            detail = str(exc).replace("\n", " ")[:160]
+            raw = str(result.data)[:300] if "result" in dir() else ""
+            return N2Result(
+                degraded=True,
+                reason=f"schema 两次不合法：{detail}",
+                meta={"raw_output": raw},
+            )
 
         unknown = [ref for ref in parsed.evidence_refs if ref not in valid_evidence_ids]
         if unknown:
@@ -205,7 +240,10 @@ def n2_analyze(
         if parsed.attribution_confidence < N2_CONFIDENCE_FLOOR:
             return N2Result(output=parsed, degraded=True, reason="归因置信度不足", meta=result.meta())
 
-        return N2Result(output=parsed, degraded=False, meta=result.meta())
+        meta = result.meta()
+        if kind_note:
+            meta["kind_normalized"] = kind_note
+        return N2Result(output=parsed, degraded=False, meta=meta)
 
     return N2Result(degraded=True, reason="未知失败", meta={})
 

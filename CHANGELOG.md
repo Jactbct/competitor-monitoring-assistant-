@@ -2,6 +2,39 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与语义化版本。
 
+## [0.3.2] - 2026-10-22
+
+接入京东站点 + 跑起显卡类目演示（RTX 5060），并修掉三个真实缺陷。
+
+### Added
+
+- **站点适配器**：`SiteProfile` 值对象，淘宝/京东各一套强结构标记与字段正则；
+  `detect_site(url)` 按域名选择，未知站点退回淘宝档（宁可报 STRUCTURE_CHANGED，不静默错解析）
+- 京东标记：`sku-name` / `p-price` / `spec-img` / `choose-attrs` / `J-hove-wrap` / 促销容器
+- `platform_for(url)` + `Target.platform` 不再硬编码 `taobao`（`add_target` 之前对所有站点都写 taobao）
+- `manage.py seed_gpu_demo`：独立租户「极光数码」+ 我方 SKU（2599/1999/毛利底线 0.22）+ 竞品监控对象
+- `docs/演示数据说明.md`：合成数据边界、三天演进、复现命令、切真实抓取的步骤
+
+### Fixed
+
+- **促销被重复计算**：整页被压成一句话时，这句话包含促销区文本 → 同一条券解析两次
+  （实测 2399-100-80 被算成 2119，多减 100）。现在：包含已知促销句的整页句直接丢弃，超长句（>120 字）不参与解析
+- **N2 输出 `kind` 被填成事件类型**（如 `real_price`）导致 schema 两次不合法、整次降级：
+  提示词补充字段约束 + 增加「明确同义映射」（`real_price→B_promo` 等），映射表外的值仍然降级，不猜
+- **降级原因没有落库**：只能看到 `degraded=True` 不知道为什么。现在 `model_meta.degrade_reason` 记录
+  schema 错误详情，schema 失败时还记录模型原始输出片段
+- `metric_daily` 之外，`Analysis.model_meta` 新增 `kind_normalized`，可追溯模型输出被纠正过
+
+### Verified
+
+| 项 | 结果 |
+|---|---|
+| `ruff check .` | All checks passed |
+| 测试 | 253 passed（含京东适配器 7 条、kind 容错 3 条） |
+| 京东三天解析 | 到手价 2399 / 2319 / 2219，`confidence=certain`，6/6 强标记 |
+| 端到端（LLM） | 两条 P0 建议均 `degraded=false`，归因「券力度变化」「真实调价」 |
+| 界面 | 显卡租户工作台 P0=2、详情页到手价明细（-100 / -80）、三天时间轴、截图 `docs/screenshots/06-07` |
+
 ## [0.3.1] - 2026-10-22
 
 接入自有模型网关（OpenAI 兼容），并修掉「配置没填好就全站不可用」的取舍错误。

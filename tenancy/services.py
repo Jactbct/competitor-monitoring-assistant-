@@ -15,7 +15,13 @@ from core.db import tenant_atomic
 from core.errors import AppError, ErrorCode
 from core.log import get_logger
 from core.tenant import current_tenant_id, tenant_scope
-from domain.collect.guardrails import GuardrailError, normalize_url, url_hash, validate_url
+from domain.collect.guardrails import (
+    GuardrailError,
+    normalize_url,
+    platform_for,
+    url_hash,
+    validate_url,
+)
 from shared.models import ChangeEvent, Snapshot, Target, TargetDemand
 from tenancy.models import (
     AuditLog,
@@ -154,10 +160,11 @@ def add_target(
         )
 
     with transaction.atomic():
-        target = Target.objects.filter(platform="taobao", url_hash=url_hash(normalized)).first()
+        platform = platform_for(normalized)
+        target = Target.objects.filter(platform=platform, url_hash=url_hash(normalized)).first()
         if target is None:
             target = Target.objects.create(
-                platform="taobao",
+                platform=platform,
                 url=normalized,
                 url_hash=url_hash(normalized),
                 source="public_sample",

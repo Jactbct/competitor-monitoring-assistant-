@@ -25,7 +25,19 @@ __all__ = [
 ]
 
 #: 允许采集的域名（白名单，防止被当成通用爬虫）
-ALLOWED_HOSTS = ("taobao.com", "tmall.com", "detail.tmall.com", "item.taobao.com")
+#: 允许采集的域名。
+#: 新增域名不是「顺手加一行」——它等于扩大抓取面，必须同时确认：robots 允许、公开页、
+#: 不涉及登录态，并走一次合规评审。京东加进来只代表「允许」，真实抓取仍要
+#: COLLECTOR_MODE=http 才会发生（默认 fixture 不产生任何外部请求）。
+ALLOWED_HOSTS = (
+    "taobao.com",
+    "tmall.com",
+    "detail.tmall.com",
+    "item.taobao.com",
+    "jd.com",
+    "item.jd.com",
+    "jd.hk",
+)
 
 #: 采集只允许带这几个头（小写比较，避免大小写绕过）
 HEADER_WHITELIST = frozenset(
@@ -74,6 +86,14 @@ def url_hash(url: str) -> str:
     import hashlib
 
     return hashlib.sha256(normalize_url(url).encode("utf-8")).hexdigest()
+
+
+def platform_for(url: str) -> str:
+    """按域名判定平台，用于 Target.platform（影响解析适配器与页面展示）。"""
+    host = (urlparse(url).hostname or "").lower()
+    if host == "jd.com" or host.endswith(".jd.com") or host.endswith(".jd.hk"):
+        return "jd"
+    return "taobao"
 
 
 def validate_url(url: str) -> str:

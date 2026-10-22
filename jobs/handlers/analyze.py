@@ -174,7 +174,11 @@ def handle_analyze(payload: dict) -> dict:
                 "threat_level": decision.threat_level,
                 "confidence": decision.confidence,
                 "evidence": evidence,
-                "model_meta": decision.model_meta,
+                # 降级原因必须落库：否则事后只能看到 degraded=True，不知道为什么
+                "model_meta": {
+                    **decision.model_meta,
+                    "degrade_reason": decision.degraded_reason or "",
+                },
                 "degraded": decision.degraded,
             },
         )

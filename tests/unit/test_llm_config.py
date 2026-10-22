@@ -130,3 +130,33 @@ def test_401_is_fatal_and_not_retried(llm):
         )
 
     assert len(_FakeClient.sent) == 1  # 只打了一次，没有无意义的重复
+
+
+# ---------------- N2 输出形状容错 ----------------
+def test_kind_alias_is_normalised():
+    """模型把事件类型（real_price）填进 kind 时，映射成合法枚举，而不是整次降级。"""
+    from domain.analyze.nodes import _normalize_kind
+
+    data, note = _normalize_kind({"kind": "real_price", "attribution": "真实调价"})
+
+    assert data["kind"] == "B_promo"
+    assert "real_price → B_promo" in note
+
+
+def test_unknown_kind_is_not_guessed():
+    """映射表外的值不做猜测：宁可降级到规则模式，也不要编一个类型出来。"""
+    from domain.analyze.nodes import _normalize_kind
+
+    data, note = _normalize_kind({"kind": "totally_new_kind"})
+
+    assert data["kind"] == "totally_new_kind"
+    assert note is None
+
+
+def test_valid_kind_is_untouched():
+    from domain.analyze.nodes import _normalize_kind
+
+    data, note = _normalize_kind({"kind": "A_info"})
+
+    assert data["kind"] == "A_info"
+    assert note is None
