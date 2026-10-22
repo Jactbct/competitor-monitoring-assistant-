@@ -52,6 +52,11 @@ def setup_logging(service: str | None = None) -> None:
     settings = get_settings()
     level = logging.DEBUG if settings.debug else logging.INFO
     logging.basicConfig(format="%(message)s", stream=sys.stdout, level=level)
+
+    # 第三方库在 DEBUG 下会把每个 TCP 包都打出来（httpx/httpcore 尤其吵），
+    # 真正的排障信息（trace_id + 业务事件）会被淹没。只留 WARNING 以上。
+    for noisy in ("httpx", "httpcore", "urllib3", "asyncio", "django.db.backends"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
