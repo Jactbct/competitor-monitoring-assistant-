@@ -24,13 +24,37 @@
 - 本地 `.env` 指向 `app_rw` 会让 `pytest` 因「无建库权限」失败 → 本地默认 owner 连接，
   生产 compose 仍用 `app_rw`（隔离验收脚本单独跑）
 
+### 实测选型（网关 nodlink.cn，7 个模型）
+
+| 模型 | N1 抽取 | N2 归因 | 判定 |
+|---|---|---|---|
+| `gpt-6-astra` | 9.7s / 4.9k tok / schema ✓ | 7.9s / 5.2k tok / schema ✓ | **选用（两者都用它）** |
+| `gpt-6.1-sol` | — | 40.8s / 7.8k tok / 结论一致 | 太慢，两跳逼近 90s 门槛 |
+| `gpt-5.6-sol` | 3.5s | 10.3s / 结论一致 | 可用备选 |
+| `gpt-5.5` | 19.6s，且一次 ping 报 40,270 input tokens | — | 配额杀手，不用 |
+| `gpt-image-2-5` | — | — | 画图模型，不适用 |
+
+**端到端实测**：一次真实变化事件（149→114）跑完 采集→diff→N2→建议卡 共 16.6s，
+`analysis.model_meta = {model: gpt-6-astra, tokens_in: 5163, tokens_out: 240, cost: 0.0226}`，
+归因「券力度变化」、置信度 0.93、`degraded=False`；`/settings` 显示今日 5,403/2,000,000 tokens。
+
+### Fixed（续）
+
+- `LLM_TIMEOUT_S` 默认 30s 对长提示词偏紧（N2 提示词实测触发 ReadTimeout）→ 本地设 60s；
+  `gpt-6.1-sol` 这类慢模型单次要 40s，选型时应按「两跳不超过 90s」倒推
+- 第三方库 DEBUG 日志刷屏（httpx/httpcore 每个 TCP 包一行）会淹没业务事件 →
+  统一压到 WARNING
+
 ### Verified
 
 | 项 | 结果 |
 |---|---|
 | `ruff check .` | All checks passed |
 | 测试（PG 16.15） | 244 passed |
-| `manage.py llm_check`（未填 Key） | 明确提示「LLM_API_KEY 为空 + 该改哪个文件」，退出码非 0 |
+| `manage.py llm_check` | 真实调用成功：`gpt-6-astra`，63/16 tokens，¥0.0004 |
+| N1 真实提示词 | 抽出 3 条促销（店铺券/每满减/秒杀），证据原文一致，schema 通过 |
+| N2 真实提示词 | 归因「券力度变化」/ high / B_promo，schema 通过 |
+| 端到端（LLM 开启） | 建议卡生成，`degraded=false`，用量与成本已记账 |
 | 地址归一化 / response_format 降级 / 401 不重试 | 9 条单测 |
 
 ## [0.3.0] - 2026-10-22

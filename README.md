@@ -1,5 +1,7 @@
 # 淘宝商品与竞品监控 Agent
 
+[![repo](https://img.shields.io/badge/GitHub-competitor--monitoring--assistant-181717?logo=github)](https://github.com/Jactbct/competitor-monitoring-assistant-)
+
 把竞品的**价格 / 促销 / 标题**变化，翻译成「改什么、谁来做、值不值得」的可执行建议。
 按《架构设计文档 v1.0》落地：**Django 5 + HTMX 模块化单体，一个库、两个进程**，
 不引入 Redis / Celery / React / SSE。
@@ -149,6 +151,9 @@ python manage.py llm_check --model <把上一步看到的模型名填这里>
 
 `LLM_BASE_URL` 可以直接粘供应商给的完整 endpoint（`https://host/v1/chat/completions`），
 会自动归一化成 base；网关不支持 `response_format` 时客户端会自动去掉该字段重试一次。
+
+已验证可用的模型（网关 nodlink.cn，2026-10-22 实测）：**`gpt-6-astra`**（N1 9.7s / N2 7.9s，schema 通过）。
+`gpt-6.1-sol` 结论一致但要 40.8s，两跳就逼近 90s 时延门槛；`gpt-5.5` 一次 ping 报 40k input tokens，会把配额打满。
 
 失败对照：401/403 → Key 或权限；404 → base_url 少了 `/v1` 或模型名不存在；
 400 提到 `response_format` → 网关不完整支持 JSON 模式（已自动降级重试）；超时 → 调 `LLM_TIMEOUT_S`。
