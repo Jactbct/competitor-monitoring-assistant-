@@ -3,7 +3,7 @@ from django.shortcuts import render
 from django.views.decorators.http import require_POST
 
 from core.errors import AppError
-from tenancy.models import Suggestion
+from tenancy.models import Outcome, Suggestion
 from tenancy.services import (
     IGNORE_REASON_TAGS,
     accept_suggestion,
@@ -64,6 +64,7 @@ def detail_panel(request, pk: str):
             "row": suggestion,
             "card": suggestion.card or {},
             "analysis": analysis,
+            "outcome": Outcome.all_objects.filter(suggestion=suggestion).first(),
             "reason_tags": IGNORE_REASON_TAGS,
         },
     )

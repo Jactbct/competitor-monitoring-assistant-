@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ui %}
 {% block title %}建议中心{% endblock %}
 {% block heading %}建议中心{% endblock %}
 {% block topbar_extra %}
@@ -60,7 +61,7 @@
           </td>
           <td class="small">
             {{ row.card.owner_role }}
-            <div class="muted mono" style="font-size:11.5px">{{ row.card.deadline|slice:":16" }}</div>
+            <div class="muted mono" style="font-size:11.5px">{{ row.card.deadline|human_dt }}</div>
           </td>
           <td>
             {% if row.status == 'pending' %}<span class="badge brand">待处理</span>

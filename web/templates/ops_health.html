@@ -23,6 +23,36 @@
   </div>
 </div>
 
+<div class="card mt16">
+  <div class="card-head">
+    <h2>B 类闸门（到手价可确定率）</h2>
+    <div class="spacer"></div>
+    {% if price_gate.open %}<span class="badge ok">可打开</span>{% else %}<span class="badge warn">未达</span>{% endif %}
+    <span class="badge {% if price_gate.b_class_enabled %}brand{% else %}muted{% endif %}">
+      B_CLASS_ENABLED={{ price_gate.b_class_enabled|yesno:"1,0" }}
+    </span>
+  </div>
+  <div class="card-body">
+    <div class="flex" style="gap:24px;align-items:baseline">
+      <div>
+        <div class="hint">7 日可确定率</div>
+        <div style="font-size:24px;font-weight:650">
+          {% if price_gate.ratio_pct is None %}—{% else %}{{ price_gate.ratio_pct }}%{% endif %}
+        </div>
+      </div>
+      <div class="hint">
+        可确定 {{ price_gate.certain }} / 有效快照 {{ price_gate.valid }}<br>
+        门槛 ≥70%：低于它就不该自动推送跟价建议（调价建议会建立在错的到手价上）
+      </div>
+    </div>
+    <div class="sep"></div>
+    <div class="hint">
+      判据命令：<span class="mono">python manage.py gate_report --days 7</span>
+      （同时给出降级率、8 字段齐全率、证据回链率、采纳率、P95 时延）
+    </div>
+  </div>
+</div>
+
 <div class="grid grid-main mt16">
   <div class="card">
     <div class="card-head"><h2>异常类型分布</h2></div>
@@ -84,7 +114,11 @@
       {% for t in tables %}
         <tr>
           <td class="mono small">{{ t.table }}</td>
-          <td class="num">{% if t.exact %}{{ t.rows }}{% else %}≈{{ t.rows }}{% endif %}</td>
+          <td class="num">
+            {% if t.unknown %}<span class="muted">—</span>
+            {% elif t.exact %}{{ t.rows }}
+            {% else %}≈{{ t.rows }}{% endif %}
+          </td>
           <td class="num small">{{ t.index_bytes|filesizeformat }}</td>
           <td class="num small">{{ t.total_bytes|filesizeformat }}</td>
           <td class="small muted">

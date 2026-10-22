@@ -50,6 +50,27 @@ def test_login_success_sets_session(client, admin_user):
     assert client.get("/").status_code == 200
 
 
+def test_workbench_first_paint_lists_pending_suggestions(auth_client, tenant):
+    """首屏就必须有建议列表：曾经 include 没传 alerts，页面显示「暂无」但计数是 1。"""
+    from tenancy.models import Suggestion
+
+    Suggestion.all_objects.create(
+        tenant=tenant,
+        kind="A_info",
+        priority="P0",
+        card={"conclusion": "首屏应当看到我", "evidence": [], "action": "a", "owner_role": "operator",
+              "deadline": "2026-10-23T12:00:00", "expected_impact": "e", "cost_risk": {"mode": "n/a"},
+              "acceptance": "x"},
+        event_id=1,
+        target_id=1,
+    )
+
+    body = auth_client.get("/").content.decode()
+
+    assert "首屏应当看到我" in body
+    assert "暂无待处理建议" not in body
+
+
 def test_target_detail_page(auth_client, binding, baseline_snapshot):
     response = auth_client.get(f"/targets/{binding.id}")
     assert response.status_code == 200

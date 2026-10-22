@@ -1,3 +1,4 @@
+{% load ui %}
 {% if alerts %}
 <table class="table">
   <thead>
@@ -10,13 +11,16 @@
       <td>
         <div class="t-title">{{ item.card.conclusion|truncatechars:64 }}</div>
         <div class="t-sub">
-          {{ item.kind }}
-          {% if item.degraded %}· <span style="color:var(--warn)">降级</span>{% endif %}
+          {% if item.degraded %}<span style="color:var(--warn)">降级输出</span>{% endif %}
           {% if item.quality_gate == 'manual_required' %}· <span style="color:var(--warn)">需人工确认</span>{% endif %}
         </div>
       </td>
-      <td><span class="badge muted">{{ item.card.kind|default:item.kind }}</span></td>
-      <td class="muted small mono">{{ item.created_at|slice:11 }} UTC</td>
+      <td>
+        <span class="badge muted">
+          {% if item.kind == 'A_info' %}信息类{% elif item.kind == 'B_promo' %}跟价类{% else %}{{ item.kind }}{% endif %}
+        </span>
+      </td>
+      <td class="muted small mono">{{ item.created_at|human_dt }}</td>
       <td><button class="btn btn-sm" hx-get="/suggestions/{{ item.id }}/panel" hx-target="#drawer">查看</button></td>
     </tr>
   {% endfor %}

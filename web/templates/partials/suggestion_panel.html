@@ -1,3 +1,4 @@
+{% load ui %}
 <div class="drawer-head">
   <span class="badge {% if row.priority == 'P0' %}p0{% elif row.priority == 'P1' %}p1{% else %}p2{% endif %}">{{ row.priority }}</span>
   <span class="badge {% if row.kind == 'A_info' %}brand{% else %}muted{% endif %}">
@@ -17,7 +18,7 @@
   <h3 style="font-size:13px;margin:0 0 6px">证据</h3>
   {% for e in card.evidence %}
     <div class="evidence" style="margin-bottom:6px">
-      <span class="id">{{ e.snapshot_evidence_id }} · {{ e.captured_at|slice:":16" }}</span>
+      <span class="id">{{ e.snapshot_evidence_id }} · {{ e.captured_at|human_dt }}</span>
       {{ e.quote }}
     </div>
   {% empty %}
@@ -29,7 +30,7 @@
   <dl class="kv">
     <dt>执行动作</dt><dd>{{ card.action }}</dd>
     <dt>责任人</dt><dd>{{ card.owner_role }}</dd>
-    <dt>截止时间</dt><dd class="mono">{{ card.deadline|slice:":16" }}</dd>
+    <dt>截止时间</dt><dd class="mono">{{ card.deadline|human_dt }}</dd>
     <dt>预期影响</dt><dd>{{ card.expected_impact }}</dd>
     <dt>验收标准</dt><dd>{{ card.acceptance }}</dd>
   </dl>
@@ -58,6 +59,25 @@
     <div class="mt12"><span class="badge p0">文案命中绝对化用语</span>
       <span class="hint">{{ card.violations|join:"、" }}</span>
     </div>
+  {% endif %}
+
+  {% if outcome %}
+    <div class="sep"></div>
+    <h3 style="font-size:13px;margin:0 0 8px">效果回看（T+7）</h3>
+    <dl class="kv">
+      <dt>采纳时价格</dt><dd class="mono">{{ outcome.price_at_accept|default:"—" }}</dd>
+      <dt>回看时价格</dt><dd class="mono">{{ outcome.price_after|default:"—" }}</dd>
+      <dt>变化</dt><dd class="mono">{% if outcome.change_pct is not None %}{{ outcome.change_pct }}{% else %}—{% endif %}</dd>
+      <dt>结论</dt>
+      <dd>
+        {% if outcome.outcome == 'price_reverted' %}<span class="badge ok">竞品价格已回涨</span>
+        {% elif outcome.outcome == 'price_kept' %}<span class="badge brand">价格维持</span>
+        {% elif outcome.outcome == 'price_further_down' %}<span class="badge p0">继续下探</span>
+        {% elif outcome.outcome == 'unavailable' %}<span class="badge warn">取不到价</span>
+        {% else %}<span class="badge muted">待回看（{{ outcome.check_due_at|date:"m-d" }}）</span>{% endif %}
+        {% if outcome.note %}<div class="hint mt8">{{ outcome.note }}</div>{% endif %}
+      </dd>
+    </dl>
   {% endif %}
 
   {% if analysis %}

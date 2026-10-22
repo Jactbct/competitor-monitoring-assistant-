@@ -36,10 +36,14 @@ def health_page(request):
     valid = Snapshot.objects.filter(captured_at__gte=since, status=Snapshot.STATUS_VALID)
     valid_total = valid.count()
     certain = valid.filter(price_confidence="certain").count()
+    ratio = (certain / valid_total) if valid_total else None
     price_gate = {
         "valid": valid_total,
         "certain": certain,
-        "ratio": (certain / valid_total) if valid_total else None,
+        "ratio": ratio,
+        # 百分比单独给一份：模板里 floatformat 不认识「0~1 表示百分比」，
+        # 直接输出会显示成 "1.0%"（本意是 100%）
+        "ratio_pct": round(ratio * 100, 1) if ratio is not None else None,
         "open": valid_total > 0 and certain / valid_total >= 0.70,
         "b_class_enabled": os.environ.get("B_CLASS_ENABLED", "0").strip() in {"1", "true", "yes", "on"},
     }

@@ -6,7 +6,8 @@
 
 ```
 采集（1 QPS 令牌桶·条件请求·robots）→ 规则抽取 → 到手价求解 → diff → 变化事件
-   → 归因（规则 / LLM 两个受约束节点）→ 8 字段建议卡 → 企微/邮件/站内 → 采纳/忽略/误报
+   → 归因（规则 / LLM 两个受约束节点）→ 8 字段建议卡 → 企微/邮件/站内
+   → 采纳/忽略/误报 → T+7 效果回看（价格回涨 / 维持 / 继续下探）
 ```
 
 ## 现在就能看
@@ -20,6 +21,7 @@ python manage.py migrate
 python manage.py seed_demo            # 演示租户 + 3 个竞品 + 「变化前」快照
 python manage.py drain_queue --tick   # 跑一轮完整闭环：采集→变化→建议
 python manage.py gate_report          # 看判据：到手价可确定率 / 降级率 / 采纳率 / P95
+python manage.py outcome_report       # 看效果：采纳 7 天后竞品价格回涨/维持/下探
 python manage.py runserver            # http://127.0.0.1:8000
 ```
 
@@ -39,6 +41,17 @@ python manage.py runserver            # http://127.0.0.1:8000
 - 三档优先级：核心 P0（4 小时内）/ 一般 P1 / 长尾 P2（次日日报）
 - 建议卡强制 8 字段：结论·证据·动作·责任人·时限·预期影响·成本风险·验收标准
 - 采纳 → 转任务；忽略必须选原因；误报回流评测集
+
+## 界面（截图见 `docs/screenshots/`）
+
+| 页面 | 说明 |
+|---|---|
+| 工作台 | P0/P1 计数、待处理建议、采集健康、待办任务、7 天回看分布 |
+| 建议中心 | 筛选 + 抽屉详情（结论/证据/动作/成本毛利/归因/效果回看）+ 采纳/忽略/误报/导出 |
+| 竞品详情 | 到手价逐项明细、属性对比、变化时间轴、最近快照 |
+| 采集健康（平台运营） | B 类闸门、异常类型、队列与预算、数据体积与保留期、越权拦截 |
+
+![工作台](docs/screenshots/01-workbench.png)
 
 ## 它刻意不做什么
 
@@ -105,6 +118,9 @@ python scripts/verify_pg_rls.py             # 10/10 通过
 
 # 接新类目/合规评审前，先看这页到底能不能解析
 python manage.py probe_page --fixture tests/fixtures/pages/1001.html
+
+# 浏览器端 E2E（需要服务在跑；用系统 Edge，不额外下载浏览器）
+python scripts/e2e_browser.py                # 8 步，截图落到 .data/e2e/
 ```
 
 | 门禁 | 判据 | 位置 |
@@ -117,6 +133,8 @@ python manage.py probe_page --fixture tests/fixtures/pages/1001.html
 | PG 隔离（RLS） | 10 项全绿（fail-closed / 跨租户 0 行 / WITH CHECK 拒绝 / 上下文不泄漏 / 快照只读 / 写路径可用） | `scripts/verify_pg_rls.py` |
 | 判据与闸门 | 六项数字 + B 类闸门结论 | `manage.py gate_report` |
 | 独立审查 | 4 Blocker 全修、14/15 Major 修、1 转 ADR | `docs/代码审查记录.md` |
+| 浏览器 E2E | 8/8（登录/抽屉/采纳/任务/详情/平台视图/403） | `scripts/e2e_browser.py`、`docs/screenshots/` |
+| 效果回看 | 采纳→T+7 四分支（回涨/维持/下探/取不到价） | `tests/integration/test_outcome.py` |
 
 ## 生产部署
 

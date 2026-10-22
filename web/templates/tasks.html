@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ui %}
 {% block title %}我的任务{% endblock %}
 {% block heading %}我的任务{% endblock %}
 {% block topbar_extra %}<span class="badge muted">共 {{ total }} 条</span>{% endblock %}
@@ -16,7 +17,7 @@
         <div style="border:1px solid var(--line-soft);border-radius:8px;padding:10px 12px;background:#fcfdff">
           <div style="font-size:13px;font-weight:500">{{ t.title }}</div>
           {% if t.card.deadline %}
-            <div class="hint mt8 mono" style="font-size:11.5px">截止 {{ t.card.deadline|slice:":16" }}</div>
+            <div class="hint mt8 mono" style="font-size:11.5px">截止 {{ t.card.deadline|human_dt }}</div>
           {% endif %}
           {% if t.card.acceptance %}
             <div class="hint mt8" style="font-size:11.5px">验收：{{ t.card.acceptance|truncatechars:52 }}</div>

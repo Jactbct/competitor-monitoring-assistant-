@@ -2,6 +2,54 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与语义化版本。
 
+## [0.3.0] - 2026-10-22
+
+补齐最后一环：**建议采纳后的 T+7 效果回看**，并补上仓库与浏览器 E2E。
+至此闭环完整：采集 → 变化 → 建议 → 采纳 → 任务 → 效果回看。
+
+### Added
+
+- **效果回看（Outcome）**：采纳时写入 `app.outcome`（含采纳时竞品价），
+  7 天后由 `outcome_check` 任务取当前价对比，输出四种确定性结论：
+  `price_reverted`（回涨≥1%，原降价是短期活动）/ `price_kept`（±1% 内维持）/
+  `price_further_down`（继续下探≥1%）/ `unavailable`（取不到价，不猜）
+- 建议抽屉新增「效果回看（T+7）」区块；工作台「本周效能」新增回涨/维持/下探三档计数与回涨率
+- `manage.py outcome_report [--days N]`：分布报表，回涨占比过半时提示「跟价应改为限时券」
+- `scripts/e2e_browser.py`：Playwright + 系统 Edge 的浏览器端 E2E（8 步，含抽屉、采纳、任务、平台视图、403）
+  → `docs/screenshots/` 五张截图作为视觉证据
+- `manage.py seed_e2e`：为 E2E 造确定性待处理建议（幂等，生产拒绝执行）
+- `.gitattributes` 统一 LF（避免容器里 `bad interpreter: /bin/bash^M`）
+
+### Fixed（都是**看截图**和**真点一遍**才发现的）
+
+- 工作台首屏「待处理建议」永远显示「暂无」：`{% include %}` 没传 `alerts`，而 partial 用的是 `alerts`
+  （上方计数是 1、列表是空，自相矛盾）→ 加 `with alerts=summary.recent` + 回归用例
+- 工作台列表时间显示 `2026-10-22T05:24 UTC`（ISO 截断）→ 用 `human_dt` 过滤器转本地 `10-22 13:24`；
+  抽屉/建议列表/任务看板的截止时间同样处理
+- `{% load ui %}` 写在 `{% extends %}` 之前导致 `/suggestions`、`/tasks` 直接 500，
+  而 `manage.py check` 查不出来（它不解析模板）→ 修正顺序，由页面冒烟用例守住
+- ops 页「B 类闸门」显示 `1.0%`（本意 100%）：模板把 0~1 的比率直接拼了 `%` → 视图另给 `ratio_pct`
+- ops 页未 analyze 的表显示 `≈-1`（PG `reltuples` 未分析时为 -1）→ 显示 `—`
+- E2E 自身两个假失败：抽屉截图抢在 200ms 动画中（拍到半开）、`HX-Refresh` 整页刷新与 `goto` 抢导航
+  （`ERR_ABORTED`）→ 等动画 + `safe_goto` 重试；顺带加了「抽屉不得超出视口」的真实断言
+- `seed_e2e` 在 `app_rw` 下被 RLS 拒绝 → 必须显式带租户上下文（`tenant_scope` + `tenant_atomic`）
+
+### Changed
+
+- 仓库初始化（git，LF 统一），首个 tag `v0.3.0`
+- 发布检查表 G4 / G10 / G11 由「未做」改为「已做」，并附证据路径
+
+### Verified
+
+| 项 | 结果 |
+|---|---|
+| `ruff check .` | All checks passed |
+| 测试（SQLite） | 232 passed, 3 skipped |
+| 测试（PG 16.15） | 235 passed |
+| 浏览器 E2E（Edge） | 8/8 通过，截图 5 张 |
+| 隔离验收 | 10/10 |
+| 效果回看 | 采纳→回看四分支均有测试；报表可跑 |
+
 ## [0.2.0] - 2026-10-22
 
 一轮**独立代码审查**驱动的大修（4 Blocker / 15 Major / 31 Minor），外加四项能力补齐。

@@ -398,6 +398,48 @@ class LlmUsage(models.Model):
         return (self.tokens_in or 0) + (self.tokens_out or 0)
 
 
+class Outcome(models.Model):
+    """建议采纳后的效果回看（T+7）。
+
+    为什么要有这张表：没有它，「采纳」只是一个点击，产品无法回答
+    「这条建议到底有没有用」。回看数据同时是评测集的天然来源（人工确认过的真实结果）。
+
+    判定口径刻意保守：
+    * 竞品价格**回涨** ≥1% → ``price_reverted``（原降价是短期活动，我方可回调）
+    * 变动在 ±1% 内 → ``price_kept``（价格维持，建议仍然有效）
+    * 继续下探 ≥1% → ``price_further_down``（我方需要再评估）
+    * 取不到价 → ``unavailable``（不猜、不当成 0 变化）
+    """
+
+    PENDING = "pending"
+    PRICE_REVERTED = "price_reverted"
+    PRICE_KEPT = "price_kept"
+    PRICE_FURTHER_DOWN = "price_further_down"
+    UNAVAILABLE = "unavailable"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, db_column="tenant_id")
+    suggestion = models.OneToOneField(
+        Suggestion, on_delete=models.CASCADE, db_column="suggestion_id", related_name="outcome"
+    )
+    target_id = models.BigIntegerField(null=True, blank=True)
+    accepted_at = models.DateTimeField()
+    check_due_at = models.DateTimeField()
+    measured_at = models.DateTimeField(null=True, blank=True)
+    price_at_accept = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    price_after = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    change_pct = models.DecimalField(max_digits=6, decimal_places=4, null=True, blank=True)
+    outcome = models.TextField(default=PENDING)
+    note = models.TextField(blank=True, default="")
+
+    objects = TenantScopedManager()
+    all_objects = models.Manager()
+
+    class Meta:
+        db_table = quote_table("app", "outcome")
+        indexes = [models.Index(fields=["outcome", "-accepted_at"], name="ix_outcome_state")]
+
+
 class LoginThrottle(models.Model):
     """登录失败计数（落库，多进程有效；不用进程内缓存）。"""
 

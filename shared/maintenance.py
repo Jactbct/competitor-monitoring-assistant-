@@ -108,13 +108,16 @@ def table_stats() -> list[dict]:
                 if not fetched:
                     continue
                 total, index_size, estimate = fetched
+                # reltuples 在「从未 analyze 过」的表上返回 -1，直接显示会变成 ≈-1
+                estimated_rows = int(estimate) if estimate is not None and estimate > 0 else 0
                 rows.append(
                     {
                         "table": f"{schema}.{table}",
                         "total_bytes": int(total or 0),
                         "index_bytes": int(index_size or 0),
-                        "rows": int(estimate or 0),
+                        "rows": estimated_rows,
                         "exact": False,
+                        "unknown": estimate is None or estimate < 0,
                     }
                 )
         return rows

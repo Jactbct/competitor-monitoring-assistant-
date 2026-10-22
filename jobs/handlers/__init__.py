@@ -8,6 +8,7 @@ from jobs.handlers.analyze import handle_analyze
 from jobs.handlers.collect import handle_collect, handle_schedule_tick
 from jobs.handlers.health import handle_daily_digest, handle_health_snapshot, handle_silence_check
 from jobs.handlers.notify import handle_notify
+from jobs.handlers.outcome import handle_outcome_check
 
 __all__ = ["HANDLERS", "get_handler"]
 
@@ -16,6 +17,7 @@ HANDLERS: dict[str, Callable[[dict], dict]] = {
     "collect": handle_collect,
     "analyze": handle_analyze,
     "notify": handle_notify,
+    "outcome_check": handle_outcome_check,
     "health_snapshot": handle_health_snapshot,
     "silence_check": handle_silence_check,
     "daily_digest": handle_daily_digest,

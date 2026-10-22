@@ -43,7 +43,8 @@
       <a class="btn btn-sm" href="/suggestions">查看全部</a>
     </div>
     <div class="card-body tight" id="alerts-panel">
-      {% include "partials/workbench_alerts.html" %}
+      {# 必须显式传 alerts：partial 用的是 alerts，不传会导致首屏为空、计数却有值 #}
+      {% include "partials/workbench_alerts.html" with alerts=summary.recent %}
     </div>
   </div>
 
@@ -60,6 +61,13 @@
         <dt>本周建议</dt><dd>{{ summary.week_total }} 条</dd>
         <dt>采纳率</dt>
         <dd>{% if summary.accept_rate is None %}<span class="muted">暂无数据</span>{% else %}{{ summary.accept_rate }}%{% endif %}</dd>
+        <dt>7 天回看</dt>
+        <dd>
+          {% if summary.outcome_total %}
+            {{ summary.outcome_total }} 条：回涨 {{ summary.outcome_reverted }} · 维持 {{ summary.outcome_kept }} · 下探 {{ summary.outcome_further_down }}
+            {% if summary.outcome_reverted_ratio %}<span class="muted small">（回涨率 {{ summary.outcome_reverted_ratio }}%）</span>{% endif %}
+          {% else %}<span class="muted">暂无到期回看</span>{% endif %}
+        </dd>
         <dt>降级率</dt>
         <dd>
           {{ summary.week_degraded }} 条
