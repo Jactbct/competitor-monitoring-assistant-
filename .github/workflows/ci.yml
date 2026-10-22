@@ -1,0 +1,98 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 门禁顺序刻意如此：先静态检查（最便宜），再 SQLite 单测（快），
+# 最后才是 PG 双后端 + 隔离验收（慢、且需要起数据库）。
+# 越靠前失败，反馈越快。
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: competitor
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d competitor"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DJANGO_SECRET_KEY: ci-only-secret
+      APP_ENV: dev
+      COLLECTOR_MODE: fixture
+      LLM_MODE: off
+      PG_RW_DSN: postgresql://app_rw:app_rw_password@127.0.0.1:5432/competitor
+      PG_WORKER_DSN: postgresql://app_worker:app_worker_password@127.0.0.1:5432/competitor
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: 静态检查（ruff）
+        run: ruff check .
+
+      - name: 单元 + 集成测试（SQLite）
+        run: pytest -q
+
+      - name: 迁移到 PostgreSQL（owner 角色）
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/competitor
+        run: |
+          python manage.py migrate --noinput
+
+      - name: 创建业务角色并授权
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h 127.0.0.1 -U postgres -d competitor -v ON_ERROR_STOP=1 -f deploy/init/01_roles.sql
+          # 角色建好后，把已存在的表补授一次（init 脚本里的 ALL TABLES 只覆盖当时已存在的表）
+          psql -h 127.0.0.1 -U postgres -d competitor -v ON_ERROR_STOP=1 <<'SQL'
+          GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA shared TO app_rw;
+          REVOKE UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA shared FROM app_rw;
+          -- 需求投影表允许 web 更新（否则「添加监控对象」在生产会 100% 失败）
+          GRANT UPDATE ON shared.target, shared.target_demand TO app_rw;
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA app TO app_rw, app_worker;
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA shared TO app_rw, app_worker;
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA app TO app_rw, app_worker;
+          SQL
+
+      - name: 双后端测试（PostgreSQL）
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/competitor
+        run: pytest -q
+
+      - name: 准备隔离验收数据
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/competitor
+        run: |
+          python manage.py seed_demo
+          DATABASE_URL="$PG_WORKER_DSN" python manage.py drain_queue --tick
+
+      - name: 隔离验收（必须用真实角色，超级用户测不出 RLS）
+        run: python scripts/verify_pg_rls.py
+
+      - name: 判据报告（不达标不阻塞 CI，但要留档）
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/competitor
+        run: python manage.py gate_report --days 7

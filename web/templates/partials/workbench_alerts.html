@@ -1,0 +1,30 @@
+{% if alerts %}
+<table class="table">
+  <thead>
+    <tr><th style="width:64px">优先级</th><th>结论</th><th style="width:84px">类型</th><th style="width:112px">时间</th><th style="width:64px"></th></tr>
+  </thead>
+  <tbody>
+  {% for item in alerts %}
+    <tr>
+      <td><span class="badge {% if item.priority == 'P0' %}p0{% elif item.priority == 'P1' %}p1{% else %}p2{% endif %}">{{ item.priority }}</span></td>
+      <td>
+        <div class="t-title">{{ item.card.conclusion|truncatechars:64 }}</div>
+        <div class="t-sub">
+          {{ item.kind }}
+          {% if item.degraded %}· <span style="color:var(--warn)">降级</span>{% endif %}
+          {% if item.quality_gate == 'manual_required' %}· <span style="color:var(--warn)">需人工确认</span>{% endif %}
+        </div>
+      </td>
+      <td><span class="badge muted">{{ item.card.kind|default:item.kind }}</span></td>
+      <td class="muted small mono">{{ item.created_at|slice:11 }} UTC</td>
+      <td><button class="btn btn-sm" hx-get="/suggestions/{{ item.id }}/panel" hx-target="#drawer">查看</button></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">
+  <strong>暂无待处理建议</strong>
+  采集与分析在后台持续运行，竞品有实质变化时会出现在这里。
+</div>
+{% endif %}

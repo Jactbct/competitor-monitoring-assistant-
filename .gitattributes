@@ -1,0 +1,8 @@
+# 统一按 LF 存储：Windows 开发、Linux 容器运行，避免 CRLF 进仓库导致
+# shell 脚本在容器里报 "bad interpreter: /bin/bash^M"
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.gz binary
+*.woff2 binary

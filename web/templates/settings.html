@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}设置{% endblock %}
+{% block heading %}设置{% endblock %}
+
+{% block content %}
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head">
+      <h2>成员与角色</h2>
+      <div class="spacer"></div>
+      <span class="badge muted">{{ members|length }} 人</span>
+    </div>
+    <div class="card-body tight">
+      <table class="table">
+        <thead><tr><th>邮箱</th><th style="width:88px">角色</th><th style="width:88px">状态</th></tr></thead>
+        <tbody>
+        {% for m in members %}
+          <tr>
+            <td class="small">{{ m.email }}</td>
+            <td><span class="badge {% if m.role == 'admin' %}brand{% else %}muted{% endif %}">{{ m.get_role_display }}</span></td>
+            <td class="small">{{ m.status }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-body" style="border-top:1px solid var(--line-soft)">
+      {% if user.role == 'admin' %}
+      <form method="post" action="/settings/members/add" class="form-row">
+        {% csrf_token %}
+        <div class="field" style="flex:1.4"><label>邮箱</label><input type="email" name="email" required></div>
+        <div class="field" style="flex:1"><label>初始密码</label><input type="password" name="password" minlength="8" required></div>
+        <div class="field" style="flex:0 0 100px">
+          <label>角色</label>
+          <select name="role">{% for value, label in roles %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+        </div>
+        <button class="btn btn-primary" type="submit">添加</button>
+      </form>
+      {% else %}
+        <div class="hint">只有管理员可以添加成员。</div>
+      {% endif %}
+      {% if messages %}{% for m in messages %}
+        <div class="mt12 small" style="color:{% if m.tags == 'error' %}var(--p0){% else %}var(--ok){% endif %}">{{ m }}</div>
+      {% endfor %}{% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>套餐用量与通道</h2></div>
+    <div class="card-body">
+      <dl class="kv">
+        <dt>监控配额</dt><dd class="mono">{{ used }} / {{ quota }}</dd>
+        <dt>企微推送</dt><dd>{% if channels.wecom %}<span class="badge ok">已配置</span>{% else %}<span class="badge muted">未配置（降级到邮件/站内）</span>{% endif %}</dd>
+        <dt>邮件通道</dt><dd>{% if channels.email %}<span class="badge ok">已配置</span>{% else %}<span class="badge muted">未配置</span>{% endif %}</dd>
+        <dt>分析引擎</dt><dd class="mono">{{ channels.llm }}</dd>
+        <dt>采集模式</dt><dd class="mono">{{ channels.collector }} · {{ channels.qps }} QPS</dd>
+      </dl>
+      <div class="sep"></div>
+      <dl class="kv">
+        <dt>今日模型用量</dt>
+        <dd class="mono">{{ usage_today.tokens }} / {{ usage_today.quota|default:"不限" }} tokens
+          {% if usage_today.remaining is not None %}<span class="muted small">（剩余 {{ usage_today.remaining }}）</span>{% endif %}
+        </dd>
+        <dt>本月调用</dt><dd class="mono">{{ usage_month.calls }} 次 · {{ usage_month.tokens }} tokens</dd>
+        <dt>本月成本</dt><dd class="mono">¥{{ usage_month.cost|floatformat:4 }}</dd>
+      </dl>
+      <div class="hint mt8">
+        配额是<b>按租户</b>算的：本租户用尽只会让本租户降级到规则模式，不影响其它租户。
+      </div>
+      <div class="sep"></div>
+      <div class="hint">
+        采集频率与推送渠道是<b>服务端配置项</b>，页面不提供调速入口 —— 一旦做成后台旋钮，
+        出事时第一责任就变成「你们提供了提高频率的功能」。
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt16">
+  <div class="card-head"><h2>审计日志</h2><div class="spacer"></div><span class="badge muted">最近 30 条</span></div>
+  <div class="card-body tight">
+    {% if audits %}
+    <table class="table">
+      <thead><tr><th style="width:150px">时间</th><th style="width:180px">动作</th><th style="width:150px">操作人</th><th>详情</th></tr></thead>
+      <tbody>
+      {% for a in audits %}
+        <tr>
+          <td class="mono small">{{ a.created_at|date:"m-d H:i:s" }}</td>
+          <td class="small">{{ a.action }}</td>
+          <td class="small">{{ a.actor|default:"—" }}</td>
+          <td class="small muted mono">{{ a.detail }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div class="empty">暂无审计记录</div>
+    {% endif %}
+  </div>
+  <div class="card-body" style="border-top:1px solid var(--line-soft)">
+    <div class="hint">审计保留 180 天。越权拦截、成员变更、建议处置、导出都会留痕。</div>
+  </div>
+</div>
+{% endblock %}

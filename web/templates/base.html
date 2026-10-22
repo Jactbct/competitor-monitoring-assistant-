@@ -1,0 +1,93 @@
+{% load static %}<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}竞品监控{% endblock %} · 竞品监控</title>
+  <link rel="stylesheet" href="{% static 'app.css' %}">
+  <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">竞</div>
+      <div>
+        <div class="brand-name">竞品监控</div>
+        <div class="brand-sub">淘宝商品与竞品变化</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <div class="nav-label">工作区</div>
+      <a class="nav-item {% if nav == 'workbench' %}active{% endif %}" href="/"><span class="ico">◧</span>工作台</a>
+      <a class="nav-item {% if nav == 'targets' %}active{% endif %}" href="/targets"><span class="ico">◎</span>监控列表</a>
+      <a class="nav-item {% if nav == 'suggestions' %}active{% endif %}" href="/suggestions">
+        <span class="ico">✦</span>建议中心
+        {% if nav_p0 %}<span class="count">{{ nav_p0 }}</span>{% endif %}
+      </a>
+      <a class="nav-item {% if nav == 'tasks' %}active{% endif %}" href="/tasks"><span class="ico">✓</span>我的任务</a>
+      <div class="nav-label">配置</div>
+      <a class="nav-item {% if nav == 'products' %}active{% endif %}" href="/products"><span class="ico">▤</span>自有商品</a>
+      <a class="nav-item {% if nav == 'settings' %}active{% endif %}" href="/settings"><span class="ico">⚙</span>设置</a>
+      {% if user.is_platform_ops %}
+        <div class="nav-label">平台运营</div>
+        <a class="nav-item {% if nav == 'ops' %}active{% endif %}" href="/ops/health"><span class="ico">◈</span>采集健康</a>
+      {% endif %}
+    </nav>
+    <div class="sidebar-foot">
+      {{ tenant.name|default:"平台运营" }}<br>
+      <span class="mono">{{ collect_mode }}</span> · <span class="mono">{{ qps }} QPS</span>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <h1>{% block heading %}{% endblock %}</h1>
+      <div class="spacer"></div>
+      {% block topbar_extra %}{% endblock %}
+      <span class="who">{{ user.email }} · {{ user.get_role_display }}</span>
+      <form method="post" action="/logout" style="margin:0">
+        {% csrf_token %}
+        <button class="btn btn-sm btn-ghost" type="submit">退出</button>
+      </form>
+    </header>
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<div id="drawer-mask" class="drawer-mask" onclick="closeDrawer()"></div>
+<div id="drawer" class="drawer"></div>
+<div id="toasts" class="toast-wrap"></div>
+
+<script>
+  function closeDrawer() {
+    document.getElementById('drawer').classList.remove('open');
+    document.getElementById('drawer-mask').classList.remove('open');
+  }
+  function toast(msg) {
+    var wrap = document.getElementById('toasts');
+    var el = document.createElement('div');
+    el.className = 'toast';
+    el.textContent = msg;
+    wrap.appendChild(el);
+    setTimeout(function () { el.remove(); }, 3200);
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDrawer(); });
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.htmx) { return; }
+    document.body.addEventListener('htmx:afterSwap', function (e) {
+      if (e.detail.target && e.detail.target.id === 'drawer') {
+        document.getElementById('drawer').classList.add('open');
+        document.getElementById('drawer-mask').classList.add('open');
+      }
+    });
+    document.body.addEventListener('htmx:responseError', function () {
+      toast('操作失败，请刷新后重试');
+    });
+  });
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

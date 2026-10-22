@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}采集健康{% endblock %}
+{% block heading %}采集健康（平台运营）{% endblock %}
+{% block topbar_extra %}<span class="badge muted">只含运行指标，不含任何租户业务内容</span>{% endblock %}
+
+{% block content %}
+<div class="grid grid-4">
+  <div class="card stat">
+    <div class="k">7 日采集量</div><div class="v">{{ health.snapshots }}</div>
+    <div class="h">有效 + 异常快照</div>
+  </div>
+  <div class="card stat {% if health.abnormal_rate > 2 %}bad{% else %}ok{% endif %}">
+    <div class="k">异常率</div><div class="v">{{ health.abnormal_rate }}<small>%</small></div>
+    <div class="h">阈值 2%</div>
+  </div>
+  <div class="card stat">
+    <div class="k">变化事件</div><div class="v">{{ health.events }}</div>
+    <div class="h">7 日累计</div>
+  </div>
+  <div class="card stat {% if health.targets_circuit_open %}bad{% endif %}">
+    <div class="k">熔断目标</div><div class="v">{{ health.targets_circuit_open }}</div>
+    <div class="h">活跃目标 {{ health.targets_active }}</div>
+  </div>
+</div>
+
+<div class="grid grid-main mt16">
+  <div class="card">
+    <div class="card-head"><h2>异常类型分布</h2></div>
+    <div class="card-body tight">
+      <table class="table">
+        <thead><tr><th>类型</th><th style="width:90px">次数</th><th>含义</th></tr></thead>
+        <tbody>
+        {% for row in health.abnormal_by_type %}
+          <tr><td class="mono small">{{ row.type }}</td><td class="num">{{ row.n }}</td>
+            <td class="small muted">
+              {% if row.type == 'STRUCTURE_CHANGED' %}强结构标记命中不足，页面可能改版 —— 4 小时内需修解析
+              {% elif row.type == 'LOGIN_WALL' %}命中登录墙/验证码，按合规要求不再重试
+              {% elif row.type == 'RATE_LIMITED' %}被限流，触发退避与熔断
+              {% elif row.type == 'RISK_CONTROL' %}疑似风控拦截
+              {% elif row.type == 'EMPTY_BODY' %}空壳页
+              {% else %}HTTP 层错误{% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="empty">7 日内无异常</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>队列与预算</h2></div>
+    <div class="card-body">
+      <dl class="kv">
+        <dt>待处理任务</dt><dd class="mono">{{ queue.pending }}</dd>
+        <dt>积压 &gt;5min</dt><dd class="mono {% if queue.backlog_5m > 0 %}price-down{% endif %}">{{ queue.backlog_5m }}</dd>
+        <dt>执行中</dt><dd class="mono">{{ queue.running }}</dd>
+        <dt>死信</dt><dd class="mono {% if queue.dead %}price-down{% endif %}">{{ queue.dead }}</dd>
+        <dt>令牌桶</dt><dd class="mono">{{ budget.tokens }} / {{ budget.capacity }}</dd>
+        <dt>出口上限</dt><dd class="mono">{{ budget.qps }} QPS</dd>
+      </dl>
+      <div class="sep"></div>
+      <dl class="kv">
+        <dt>原始页</dt><dd class="mono">{{ storage.files }} 个 · {{ storage.bytes }} B</dd>
+        <dt>保留期</dt><dd class="mono">{{ storage.retention_days }} 天</dd>
+        <dt>字段完整率</dt><dd class="mono">{{ health.avg_completeness|floatformat:3 }}</dd>
+      </dl>
+    </div>
+  </div>
+</div>
+
+<div class="card mt16">
+  <div class="card-head">
+    <h2>数据体积与保留期</h2>
+    <div class="spacer"></div>
+    <span class="badge muted">快照 {{ volume.rows }} 行 · 保留 {{ snapshot_retention_days }} 天</span>
+  </div>
+  <div class="card-body tight">
+    {% if tables %}
+    <table class="table">
+      <thead><tr><th>表</th><th style="width:120px">行数（估）</th><th style="width:120px">索引体积</th><th style="width:120px">总体积</th><th>判读</th></tr></thead>
+      <tbody>
+      {% for t in tables %}
+        <tr>
+          <td class="mono small">{{ t.table }}</td>
+          <td class="num">{% if t.exact %}{{ t.rows }}{% else %}≈{{ t.rows }}{% endif %}</td>
+          <td class="num small">{{ t.index_bytes|filesizeformat }}</td>
+          <td class="num small">{{ t.total_bytes|filesizeformat }}</td>
+          <td class="small muted">
+            {% if t.table == 'shared.snapshot' and t.rows > 20000000 %}已超过分区阈值（2000 万行）→ 按 ADR-005 做月分区
+            {% elif t.table == 'shared.snapshot' %}未到分区阈值（2000 万行）
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div class="empty">当前后端不支持体积查询（SQLite 开发库），生产 PG 上会显示每张表的大小。</div>
+    {% endif %}
+  </div>
+  <div class="card-body" style="border-top:1px solid var(--line-soft)">
+    <div class="hint">
+      快照只增不改：按 400 天保留 + BRIN 索引（不是 B-tree，体积约 1%）。
+      超过 2000 万行或单表 50 GB 才启动月分区 —— 提前分区是拿复杂度换不来收益的典型。
+    </div>
+  </div>
+</div>
+
+<div class="card mt16">
+  <div class="card-head"><h2>越权拦截</h2><div class="spacer"></div>
+    <span class="badge {% if blocked_total %}p0{% else %}ok{% endif %}">累计 {{ blocked_total }}</span>
+  </div>
+  <div class="card-body">
+    <div class="hint">
+      这里只显示计数，不显示明细 —— 拦截记录在审计表里受 RLS 约束，平台运营读不到。
+      这个数 <b>大于 0 就应立刻告警</b>（P0）：说明有请求试图跨租户访问，
+      或者某处漏写了租户过滤。
+    </div>
+  </div>
+</div>
+
+<div class="card mt16">
+  <div class="card-head"><h2>最近 24 小时指标</h2></div>
+  <div class="card-body tight">
+    {% if metrics %}
+    <table class="table">
+      <thead><tr><th style="width:130px">时间</th><th>指标</th><th style="width:90px">值</th></tr></thead>
+      <tbody>
+      {% for m in metrics %}
+        <tr>
+          <td class="mono small">{{ m.day|date:"m-d" }} {{ m.hour }}:00</td>
+          <td class="small">{{ m.metric }}</td>
+          <td class="num">{{ m.value|floatformat:3 }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div class="empty">还没有指标数据。worker 每小时写一次，或手动跑 <span class="mono">manage.py drain_queue</span>。</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}工作台{% endblock %}
+{% block heading %}工作台{% endblock %}
+{% block topbar_extra %}
+  <span class="badge muted">每 30 秒自动刷新 P0</span>
+{% endblock %}
+
+{% block content %}
+<div hx-get="/workbench/alerts" hx-trigger="every 30s" hx-target="#alerts-panel" hx-swap="innerHTML"></div>
+<div class="grid grid-4">
+  <div class="card stat p0">
+    <div class="k">今日 P0 待处理</div>
+    <div class="v" id="p0-count">{{ summary.p0 }}</div>
+    <div class="h">核心竞品显著降价，需 4 小时内决策</div>
+  </div>
+  <div class="card stat p1">
+    <div class="k">P1 待处理</div>
+    <div class="v">{{ summary.p1 }}</div>
+    <div class="h">进次日 09:00 日报</div>
+  </div>
+  <div class="card stat {% if summary.circuit_open or summary.targets_stale %}bad{% else %}ok{% endif %}">
+    <div class="k">采集健康</div>
+    <div class="v">{{ summary.targets_healthy }}<small>/ {{ summary.targets_total }}</small></div>
+    <div class="h">
+      {% if summary.circuit_open %}熔断 {{ summary.circuit_open }} 个{% endif %}
+      {% if summary.targets_stale %}　超 6 小时未采 {{ summary.targets_stale }} 个{% endif %}
+      {% if not summary.circuit_open and not summary.targets_stale %}全部正常{% endif %}
+    </div>
+  </div>
+  <div class="card stat">
+    <div class="k">待办任务</div>
+    <div class="v">{{ summary.tasks_todo }}</div>
+    <div class="h">{% if summary.overdue %}<span style="color:var(--p0)">已逾期 {{ summary.overdue }}</span>{% else %}无逾期{% endif %}</div>
+  </div>
+</div>
+
+<div class="grid grid-main mt16">
+  <div class="card">
+    <div class="card-head">
+      <h2>待处理建议</h2>
+      <span class="badge muted">{{ summary.p0|add:summary.p1|add:summary.p2 }} 条</span>
+      <div class="spacer"></div>
+      <a class="btn btn-sm" href="/suggestions">查看全部</a>
+    </div>
+    <div class="card-body tight" id="alerts-panel">
+      {% include "partials/workbench_alerts.html" %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>本周效能</h2></div>
+    <div class="card-body">
+      <div class="kv">
+        <dt>价格竞争力</dt>
+        <dd>
+          {% if summary.competitiveness is None %}<span class="muted">需先维护自有商品与竞品</span>
+          {% elif summary.competitiveness > 0 %}<span style="color:var(--ok);font-weight:600">高于竞品均值 {{ summary.competitiveness }}%</span>
+          {% else %}<span style="color:var(--p0);font-weight:600">低于竞品均值 {{ summary.competitiveness }}%</span>{% endif %}
+        </dd>
+        <dt>本周建议</dt><dd>{{ summary.week_total }} 条</dd>
+        <dt>采纳率</dt>
+        <dd>{% if summary.accept_rate is None %}<span class="muted">暂无数据</span>{% else %}{{ summary.accept_rate }}%{% endif %}</dd>
+        <dt>降级率</dt>
+        <dd>
+          {{ summary.week_degraded }} 条
+          {% if summary.week_total %}<span class="muted small">（{{ summary.week_degraded|floatformat:0 }}/{{ summary.week_total }}）</span>{% endif %}
+        </dd>
+      </div>
+      <div class="sep"></div>
+      <div class="hint">
+        降级率持续高于 20% 说明上游有问题（prompt、页面改版或数据源），
+        去「采集健康」看异常类型分布。
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

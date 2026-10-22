@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}出错了{% endblock %}
+{% block heading %}出错了{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <h2 style="font-size:15px;margin-bottom:6px">{{ error.message|default:"请求无法完成" }}</h2>
+    <p class="hint" style="margin:0 0 14px">错误码 <span class="mono">{{ error.code|default:"UNKNOWN" }}</span> · 请求 ID <span class="mono">{{ request_id }}</span></p>
+    {% if error.details %}
+      <div class="evidence">{{ error.details }}</div>
+    {% endif %}
+    <div class="mt16"><a class="btn" href="javascript:history.back()">返回上一页</a></div>
+  </div>
+</div>
+{% endblock %}

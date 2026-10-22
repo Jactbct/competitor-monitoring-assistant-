@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}建议中心{% endblock %}
+{% block heading %}建议中心{% endblock %}
+{% block topbar_extra %}
+  <a class="btn btn-sm" href="/suggestions/export.csv?status={{ status }}">导出 CSV</a>
+  <div class="tabs">
+    <a href="/suggestions?status=pending" class="{% if status == 'pending' %}active{% endif %}">待处理 {{ counts.pending }}</a>
+    <a href="/suggestions?status=accepted" class="{% if status == 'accepted' %}active{% endif %}">已采纳 {{ counts.accepted }}</a>
+    <a href="/suggestions?status=ignored" class="{% if status == 'ignored' %}active{% endif %}">已忽略 {{ counts.ignored }}</a>
+    <a href="/suggestions?status=false_positive" class="{% if status == 'false_positive' %}active{% endif %}">误报 {{ counts.false_positive }}</a>
+  </div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-head">
+    <h2>{% if status == 'pending' %}待处理{% else %}历史建议{% endif %}</h2>
+    <div class="spacer"></div>
+    <div class="tabs">
+      <a href="?status={{ status }}" class="{% if not priority %}active{% endif %}">全部</a>
+      <a href="?status={{ status }}&priority=P0" class="{% if priority == 'P0' %}active{% endif %}">P0 {{ counts.p0 }}</a>
+      <a href="?status={{ status }}&priority=P1" class="{% if priority == 'P1' %}active{% endif %}">P1 {{ counts.p1 }}</a>
+      <a href="?status={{ status }}&priority=P2" class="{% if priority == 'P2' %}active{% endif %}">P2 {{ counts.p2 }}</a>
+    </div>
+    <div class="tabs">
+      <a href="?status={{ status }}{% if priority %}&priority={{ priority }}{% endif %}" class="{% if not kind %}active{% endif %}">全部类型</a>
+      <a href="?status={{ status }}{% if priority %}&priority={{ priority }}{% endif %}&kind=A_info" class="{% if kind == 'A_info' %}active{% endif %}">信息类</a>
+      <a href="?status={{ status }}{% if priority %}&priority={{ priority }}{% endif %}&kind=B_promo" class="{% if kind == 'B_promo' %}active{% endif %}">跟价类</a>
+    </div>
+  </div>
+  <div class="card-body tight">
+    {% if rows %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th style="width:60px">优先级</th>
+          <th style="width:80px">类型</th>
+          <th>结论</th>
+          <th style="width:150px">责任人 / 截止</th>
+          <th style="width:96px">状态</th>
+          <th style="width:120px"></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td><span class="badge {% if row.priority == 'P0' %}p0{% elif row.priority == 'P1' %}p1{% else %}p2{% endif %}">{{ row.priority }}</span></td>
+          <td>
+            <span class="badge {% if row.kind == 'A_info' %}brand{% elif row.kind == 'B_promo' %}muted{% else %}muted{% endif %}">
+              {% if row.kind == 'A_info' %}信息{% elif row.kind == 'B_promo' %}跟价{% else %}{{ row.kind }}{% endif %}
+            </span>
+          </td>
+          <td>
+            <div class="t-title">{{ row.card.conclusion|truncatechars:58 }}</div>
+            <div class="t-sub">
+              {{ row.target_title|truncatechars:26 }}
+              {% if row.degraded %}<span class="badge warn" style="margin-left:4px">降级</span>{% endif %}
+              {% if row.quality_gate == 'manual_required' %}<span class="badge warn" style="margin-left:4px">需人工确认</span>{% endif %}
+            </div>
+          </td>
+          <td class="small">
+            {{ row.card.owner_role }}
+            <div class="muted mono" style="font-size:11.5px">{{ row.card.deadline|slice:":16" }}</div>
+          </td>
+          <td>
+            {% if row.status == 'pending' %}<span class="badge brand">待处理</span>
+            {% elif row.status == 'accepted' %}<span class="badge ok">已采纳</span>
+            {% elif row.status == 'ignored' %}<span class="badge muted">已忽略</span>
+            {% else %}<span class="badge warn">误报</span>{% endif %}
+          </td>
+          <td class="nowrap">
+            <button class="btn btn-sm" hx-get="/suggestions/{{ row.id }}/panel" hx-target="#drawer">查看</button>
+            {% if row.status == 'pending' and user.can_write %}
+              <form hx-post="/suggestions/{{ row.id }}/accept" hx-swap="none" style="display:inline">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-primary" type="submit">采纳</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div class="empty">
+        <strong>这个筛选条件下没有建议</strong>
+        建议来自「竞品实质变化」：价格、促销、标题、主图。没有变化就不会产生建议，也不会消耗模型调用。
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

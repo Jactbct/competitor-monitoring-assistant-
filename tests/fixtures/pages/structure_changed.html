@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>宝贝详情 - 淘宝网</title></head>
+<body>
+<div class="tb-detail">
+  <div class="new-layout-container">
+    <div class="new-layout-header"><span class="new-shop-logo"></span><span class="new-shop-name"></span></div>
+    <div class="new-layout-main">
+      <div class="new-layout-gallery"><div class="skeleton-box"></div><div class="skeleton-box"></div></div>
+      <div class="new-layout-info">
+        <div class="skeleton-line w-60"></div>
+        <div class="skeleton-line w-40"></div>
+        <div class="skeleton-line w-80"></div>
+        <p class="loading-tip">页面正在加载，请稍候…</p>
+        <p class="loading-tip">若长时间无法显示，请刷新重试或切换到手机淘宝查看。</p>
+        <p class="loading-tip">本页面为新版详情页，部分旧版标识已下线，结构与旧版商品页不同。</p>
+        <div class="new-layout-desc">
+          <p>该商品详情区已完成改版升级，原有的价格区块、标题区与规格选择区均更换为新的组件，
+             旧的 class 命名不再保留。采集侧若依赖旧标记，将无法取到价格与标题。</p>
+          <p>这是真实世界中经常发生的情况：平台会在不做通知的前提下调整前端结构，
+             依赖固定选择器的采集策略会在某一天突然全部失效，而且不会报错，只会静默地取到空值。</p>
+          <p>因此采集层必须能用「强结构标记命中数」把这种页面判出来，而不是把空壳页当成有效快照落库。
+             否则下游的 diff 会把「取不到」当成「变了」，进而生成大量误报建议。</p>
+        </div>
+        <div class="new-layout-service">
+          <span>七天无理由</span><span>运费险</span><span>正品保障</span><span>极速退款</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

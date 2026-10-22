@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>淘宝网 - 登录</title>
+  <link rel="stylesheet" href="//g.alicdn.com/tb/login/1.0.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-panel">
+    <h1 class="login-title">亲，请登录</h1>
+    <p class="login-tip">登录后可查看商品详情、加入购物车并享受会员价。</p>
+    <div class="login-qrcode" id="J_QRCodeLogin">
+      <img src="//img.alicdn.com/tfs/qrcode-login.png" alt="扫码登录">
+      <span class="qrcode-tip">打开手机淘宝扫一扫</span>
+    </div>
+    <form class="login-form" method="post" action="//login.taobao.com/member/login.jhtml">
+      <input type="text" name="fm-login-id" placeholder="账号">
+      <input type="password" name="fm-login-password" placeholder="密码">
+      <button type="submit">登录</button>
+    </form>
+    <div class="login-footer">
+      <a href="//reg.taobao.com">免费注册</a>
+      <a href="//help.taobao.com">忘记密码</a>
+    </div>
+    <p class="login-notice">为保障账号安全，本次访问需要进行安全验证。请完成滑动验证后继续访问。</p>
+    <p class="login-notice">如您是商家，请前往千牛工作台登录；如您是开发者，请使用开放平台接口，禁止抓取。</p>
+    <div class="login-placeholder">
+      登录后即可查看商品价格、库存、优惠券与促销活动信息。未登录状态下，商品详情页不展示价格与购买入口。
+      若您持续看到此页面，说明当前会话已失效，请重新登录。为保护用户隐私，平台不会向未登录会话返回商品评价与成交记录。
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}{{ target.last_title|default:"竞品详情"|truncatechars:20 }}{% endblock %}
+{% block heading %}竞品详情{% endblock %}
+{% block topbar_extra %}
+  <a class="btn btn-sm" href="{{ target.url }}" target="_blank" rel="noopener noreferrer">打开原页 ↗</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <div class="flex flex-wrap" style="gap:10px">
+      <h2 style="font-size:15px">{{ target.last_title|default:"（尚未采集到标题）" }}</h2>
+      <span class="badge {% if binding.priority == 'core' %}p0{% elif binding.priority == 'normal' %}p2{% else %}muted{% endif %}">
+        {{ binding.get_priority_display }}
+      </span>
+      {% if target.circuit_state == 'open' %}<span class="badge p0">采集中断</span>{% endif %}
+    </div>
+    <div class="t-sub mono mt8">{{ target.url }}</div>
+  </div>
+</div>
+
+<div class="grid grid-4 mt16">
+  <div class="card stat">
+    <div class="k">当前到手价</div>
+    <div class="v">
+      {% if latest.price_final is not None %}¥{{ latest.price_final }}{% else %}—{% endif %}
+      {% if latest.price_confidence != 'certain' %}<small style="color:var(--warn)">不确定</small>{% endif %}
+    </div>
+    <div class="h">{% if latest %}展示价 ¥{{ latest.price_display|default:"—" }}{% endif %}</div>
+  </div>
+  <div class="card stat">
+    <div class="k">字段完整率</div>
+    <div class="v">{{ latest.field_completeness|default:"—" }}</div>
+    <div class="h">6 个强结构标记命中数</div>
+  </div>
+  <div class="card stat">
+    <div class="k">采集状态</div>
+    <div class="v" style="font-size:18px">
+      {% if target.circuit_state == 'open' %}熔断中{% elif target.last_status == 'abnormal' %}异常页{% else %}正常{% endif %}
+    </div>
+    <div class="h">下次采集 {{ target.next_due_at|date:"m-d H:i" }}</div>
+  </div>
+  <div class="card stat">
+    <div class="k">变化事件</div>
+    <div class="v">{{ events|length }}</div>
+    <div class="h">最近 20 条</div>
+  </div>
+</div>
+
+<div class="grid grid-main mt16">
+  <div class="card">
+    <div class="card-head"><h2>到手价明细</h2>
+      <div class="spacer"></div>
+      <span class="badge {% if price_detail.confidence == 'certain' %}ok{% else %}warn{% endif %}">
+        {% if price_detail.confidence == 'certain' %}可确定{% else %}不确定{% endif %}
+      </span>
+    </div>
+    <div class="card-body">
+      {% if price_detail.lines %}
+        <table class="promo-lines">
+          {% for line in price_detail.lines %}
+          <tr>
+            <td style="width:46%">
+              {{ line.label }}
+              {% if line.evidence_text %}<div class="t-sub" style="font-size:11.5px">{{ line.evidence_text|truncatechars:40 }}</div>{% endif %}
+            </td>
+            <td class="num {% if line.applied %}price-down{% else %}muted{% endif %}" style="width:22%">
+              {% if line.applied %}-¥{{ line.amount }}{% else %}未生效{% endif %}
+            </td>
+            <td class="muted small">{{ line.note }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      {% else %}
+        <div class="empty" style="padding:18px">该快照没有解析到促销规则，到手价 = 展示价</div>
+      {% endif %}
+      {% if price_detail.reasons %}
+        <div class="sep"></div>
+        <div class="hint">
+          标注为「不确定」的原因：
+          <ul style="margin:6px 0 0 16px;padding:0">
+            {% for r in price_detail.reasons %}<li>{{ r }}</li>{% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+      <div class="sep"></div>
+      <div class="hint">到手价按「秒杀价 → 满减/每满减 → 券」顺序求解；规则冲突时按保守解读并标不确定，<b>绝不估算</b>。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>属性（竞品）</h2></div>
+    <div class="card-body">
+      {% if attrs %}
+        <div class="kv">
+          {% for k, v in attrs.items %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}
+        </div>
+      {% else %}
+        <div class="empty" style="padding:14px">未抽取到属性</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-main mt16">
+  <div class="card">
+    <div class="card-head"><h2>变化时间轴</h2></div>
+    <div class="card-body">
+      {% if events %}
+        <ul class="timeline">
+          {% for e in events %}
+          <li class="{% if e.priority_label == 'P0' %}p0{% endif %}">
+            <div class="when">
+              {{ e.detected_at|date:"m-d H:i" }}
+              {% if e.priority_label %}<span class="badge {% if e.priority_label == 'P0' %}p0{% elif e.priority_label == 'P1' %}p1{% else %}p2{% endif %}" style="margin-left:6px">{{ e.priority_label }}</span>{% endif %}
+            </div>
+            <div class="what">
+              {% for k, v in e.deltas.items %}
+                <div>
+                  <span class="muted small">{{ k }}</span>：
+                  {% if v.before %}<span class="strike">{{ v.before|truncatechars:30 }}</span> → {% endif %}
+                  <b>{{ v.after|truncatechars:40 }}</b>
+                  {% if v.pct %}<span class="badge {% if v.pct|slice:':1' == '-' %}p0{% else %}ok{% endif %}">{{ v.pct }}</span>{% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty"><strong>暂无变化</strong>采集到的内容与上次一致，说明竞品稳定。</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>最近快照</h2></div>
+    <div class="card-body tight">
+      <table class="table">
+        <thead><tr><th>时间</th><th>状态</th><th>到手价</th><th>完整率</th></tr></thead>
+        <tbody>
+        {% for s in snapshots %}
+          <tr>
+            <td class="small mono">{{ s.captured_at|date:"m-d H:i" }}</td>
+            <td>
+              {% if s.status == 'valid' %}<span class="badge ok">有效</span>
+              {% else %}<span class="badge warn">{{ s.abnormal_type|default:"异常" }}</span>{% endif %}
+            </td>
+            <td class="num">{% if s.price_final %}¥{{ s.price_final }}{% else %}—{% endif %}</td>
+            <td class="mono small">{{ s.field_completeness|default:"—" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="empty">暂无快照</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

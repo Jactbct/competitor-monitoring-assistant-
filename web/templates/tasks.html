@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}我的任务{% endblock %}
+{% block heading %}我的任务{% endblock %}
+{% block topbar_extra %}<span class="badge muted">共 {{ total }} 条</span>{% endblock %}
+
+{% block content %}
+<div class="grid grid-3">
+  {% for col in columns %}
+  <div class="card">
+    <div class="card-head">
+      <h2>{{ col.label }}</h2>
+      <span class="badge muted">{{ col.items|length }}</span>
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px;min-height:120px">
+      {% for t in col.items %}
+        <div style="border:1px solid var(--line-soft);border-radius:8px;padding:10px 12px;background:#fcfdff">
+          <div style="font-size:13px;font-weight:500">{{ t.title }}</div>
+          {% if t.card.deadline %}
+            <div class="hint mt8 mono" style="font-size:11.5px">截止 {{ t.card.deadline|slice:":16" }}</div>
+          {% endif %}
+          {% if t.card.acceptance %}
+            <div class="hint mt8" style="font-size:11.5px">验收：{{ t.card.acceptance|truncatechars:52 }}</div>
+          {% endif %}
+          <div class="mt8 flex" style="gap:6px">
+            {% if t.status != 'doing' %}
+            <form hx-post="/tasks/{{ t.id }}/status" hx-swap="none" style="margin:0">
+              {% csrf_token %}<input type="hidden" name="status" value="doing">
+              <button class="btn btn-sm" type="submit">开始</button>
+            </form>
+            {% endif %}
+            {% if t.status != 'done' %}
+            <form hx-post="/tasks/{{ t.id }}/status" hx-swap="none" style="margin:0">
+              {% csrf_token %}<input type="hidden" name="status" value="done">
+              <button class="btn btn-sm btn-primary" type="submit">完成</button>
+            </form>
+            {% endif %}
+            {% if t.status != 'todo' %}
+            <form hx-post="/tasks/{{ t.id }}/status" hx-swap="none" style="margin:0">
+              {% csrf_token %}<input type="hidden" name="status" value="todo">
+              <button class="btn btn-sm btn-ghost" type="submit">退回</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+      {% empty %}
+        <div class="empty" style="padding:20px 0">暂无任务</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card mt16">
+  <div class="card-body">
+    <div class="hint">
+      任务来自「采纳建议」，一条建议只转一次任务（幂等由状态机保证）。
+      完成时以建议卡里的「验收标准」为准，而不是「做过就算」——这是效果追踪的起点。
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}监控列表{% endblock %}
+{% block heading %}监控列表{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-head">
+    <h2>添加监控对象</h2>
+    <div class="spacer"></div>
+    <span class="hint">配额 <span class="mono">{{ used }}/{{ quota }}</span></span>
+  </div>
+  <div class="card-body">
+    <form method="post" action="/targets/add" class="form-row">
+      {% csrf_token %}
+      <div class="field" style="flex:2.2">
+        <label>商品链接（仅支持公开详情页）</label>
+        <input type="text" name="url" placeholder="https://item.taobao.com/item.htm?id=1001" required>
+      </div>
+      <div class="field" style="flex:0 0 132px">
+        <label>优先级</label>
+        <select name="priority">
+          <option value="core">核心（2 小时）</option>
+          <option value="normal" selected>一般（12 小时）</option>
+          <option value="long_tail">长尾（24 小时）</option>
+        </select>
+      </div>
+      <div class="field" style="flex:0 0 200px">
+        <label>对标自有商品</label>
+        <select name="self_product_id">
+          <option value="">不绑定</option>
+          {% for p in products %}
+            <option value="{{ p.id }}">{{ p.sku }} {{ p.title|truncatechars:14 }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="btn btn-primary" type="submit">加入监控</button>
+    </form>
+    {% if messages %}
+      {% for m in messages %}
+        <div class="mt12 small" style="color:{% if m.tags == 'error' %}var(--p0){% else %}var(--ok){% endif %}">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
+    <div class="hint mt8">
+      采集只读公开页、不带登录态、遵守 robots；频率由服务端统一限速，页面不提供调速入口。
+      未绑定自有商品时，跟价类建议无法测算毛利，只会出信息类建议。
+    </div>
+  </div>
+</div>
+
+<div class="card mt16">
+  <div class="card-head">
+    <h2>监控中</h2>
+    <span class="badge muted">{{ rows|length }} 个</span>
+    <div class="spacer"></div>
+    <form method="get" action="/targets" class="flex" style="margin:0">
+      <input type="search" name="q" value="{{ keyword }}" placeholder="搜索标题或链接" style="width:190px">
+      <select name="priority" onchange="this.form.submit()" style="width:110px">
+        <option value="">全部优先级</option>
+        <option value="core" {% if priority == 'core' %}selected{% endif %}>核心</option>
+        <option value="normal" {% if priority == 'normal' %}selected{% endif %}>一般</option>
+        <option value="long_tail" {% if priority == 'long_tail' %}selected{% endif %}>长尾</option>
+      </select>
+      <button class="btn btn-sm" type="submit">筛选</button>
+    </form>
+  </div>
+  <div class="card-body tight">
+    {% if rows %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>商品</th>
+          <th style="width:110px">优先级</th>
+          <th style="width:120px">到手价</th>
+          <th style="width:110px">展示价</th>
+          <th style="width:130px">最近采集</th>
+          <th style="width:110px">状态</th>
+          <th style="width:120px"></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td>
+            <div class="t-title"><a href="/targets/{{ row.binding.id }}">{{ row.target.last_title|default:"（尚未采集）"|truncatechars:44 }}</a></div>
+            <div class="t-sub mono">{{ row.target.url|truncatechars:52 }}</div>
+          </td>
+          <td>
+            <select name="priority" style="height:28px;font-size:12.5px"
+                    hx-post="/targets/{{ row.binding.id }}/priority"
+                    hx-trigger="change"
+                    hx-vals='js:{priority: event.target.value}'
+                    hx-swap="none">
+              <option value="core" {% if row.binding.priority == 'core' %}selected{% endif %}>核心</option>
+              <option value="normal" {% if row.binding.priority == 'normal' %}selected{% endif %}>一般</option>
+              <option value="long_tail" {% if row.binding.priority == 'long_tail' %}selected{% endif %}>长尾</option>
+            </select>
+          </td>
+          <td>
+            {% if row.target.last_price_final %}
+              <span class="num price-down">¥{{ row.target.last_price_final }}</span>
+              {% if row.target.last_price_confidence != 'certain' %}<span class="badge warn" style="margin-left:4px">不确定</span>{% endif %}
+            {% else %}<span class="muted">—</span>{% endif %}
+          </td>
+          <td class="num">{% if row.target.last_price_display %}¥{{ row.target.last_price_display }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td class="muted small">
+            {% if row.target.last_captured_at %}{{ row.target.last_captured_at|date:"m-d H:i" }}{% else %}未采集{% endif %}
+          </td>
+          <td>
+            {% if row.target.circuit_state == 'open' %}
+              <span class="badge p0">采集中断</span>
+            {% elif row.target.last_status == 'abnormal' %}
+              <span class="badge warn">异常页</span>
+            {% elif row.target.last_captured_at %}
+              <span class="badge ok">正常</span>
+            {% else %}
+              <span class="badge muted">待首采</span>
+            {% endif %}
+          </td>
+          <td class="nowrap">
+            <a class="btn btn-sm" href="/targets/{{ row.binding.id }}">详情</a>
+            <form method="post" action="/targets/{{ row.binding.id }}/delete" style="display:inline"
+                  hx-post="/targets/{{ row.binding.id }}/delete" hx-swap="none"
+                  onsubmit="return confirm('停止监控该竞品？历史快照与建议会保留。')">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-danger" type="submit">移除</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div class="empty">
+        <strong>还没有监控对象</strong>
+        在上方粘贴竞品详情页链接即可开始。同名链接只采一次，多个租户共享采集结果但数据互相不可见。
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

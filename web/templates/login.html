@@ -1,0 +1,35 @@
+{% load static %}<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 · 竞品监控</title>
+  <link rel="stylesheet" href="{% static 'app.css' %}">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="card login-card">
+    <div class="flex" style="gap:10px;margin-bottom:14px">
+      <div class="brand-mark">竞</div>
+      <div class="brand-name" style="color:var(--text)">竞品监控工作台</div>
+    </div>
+    <h1>登录</h1>
+    <p class="sub">只看公开页的竞品变化，把变化翻译成「改什么、谁来做、值不值得」。</p>
+    {% if error %}<div class="alert-error">{{ error }}</div>{% endif %}
+    <form method="post" action="/login">
+      {% csrf_token %}
+      <div class="field">
+        <label>邮箱</label>
+        <input type="email" name="email" value="{{ email|default:'' }}" autocomplete="username" required autofocus>
+      </div>
+      <div class="field mt12">
+        <label>密码</label>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn btn-primary mt16" type="submit" style="width:100%;height:36px">登录</button>
+    </form>
+    <div class="hint mt12">演示账号：<span class="mono">ops@demo.local</span> / <span class="mono">demo12345</span></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,101 @@
+# 单机三件套：db + web + worker（没有 Redis、没有 Celery、没有独立前端）
+# 私有化交付就是这个目录 + 两个镜像，客户机器上 `docker compose up -d` 即可。
+
+x-app-env: &app_env
+  APP_ENV: ${APP_ENV:-prod}
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?必须设置}
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-127.0.0.1,localhost}
+  DJANGO_DEBUG: "0"
+  APP_TIMEZONE: Asia/Shanghai
+  # 采集：出口硬上限，只能改这里并重启（不提供后台旋钮）
+  COLLECTOR_QPS: ${COLLECTOR_QPS:-1}
+  COLLECTOR_MODE: ${COLLECTOR_MODE:-fixture}
+  COLLECTOR_UA: ${COLLECTOR_UA:-TaobaoCompetitorMonitor/0.1 (+mailto:ops@example.com)}
+  ROBOTS_ENFORCE: "1"
+  RAW_STORE_DIR: /data/raw
+  RAW_RETENTION_DAYS: "7"
+  # 分析：off = 纯规则引擎（无密钥也能跑通全链路）
+  LLM_MODE: ${LLM_MODE:-off}
+  LLM_BASE_URL: ${LLM_BASE_URL:-}
+  LLM_API_KEY: ${LLM_API_KEY:-}
+  LLM_MODEL_EXTRACT: ${LLM_MODEL_EXTRACT:-small}
+  LLM_MODEL_REASON: ${LLM_MODEL_REASON:-mid}
+  # 一期 B 类闸门：默认关闭（M1 实测到手价可确定率 ≥70% 再打开）
+  B_CLASS_ENABLED: ${B_CLASS_ENABLED:-0}
+  WECOM_WEBHOOK: ${WECOM_WEBHOOK:-}
+  MAIL_FROM: ${MAIL_FROM:-}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-465}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-competitor}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?必须设置}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-competitor}"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # 一次性任务：建表 + 静态文件。失败即停，不带着半套 schema 起服务。
+  # migrate 用库 owner（postgres）跑：建表、建 schema、装 RLS 策略都需要 DDL 权限。
+  init:
+    build: .
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput"
+    environment:
+      <<: *app_env
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-competitor}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    build: .
+    restart: unless-stopped
+    command: ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4", "--access-logfile", "-"]
+    environment:
+      <<: *app_env
+      DATABASE_URL: postgresql://app_rw:${APP_RW_PASSWORD:-app_rw_password}@db:5432/${POSTGRES_DB:-competitor}
+    volumes:
+      - rawdata:/data/raw
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+
+  worker:
+    build: .
+    restart: unless-stopped
+    # 单进程 + 内线程池；调度只在 worker 里跑，所以 worker 只能有一个
+    command: ["python", "manage.py", "run_worker", "--concurrency", "2"]
+    environment:
+      <<: *app_env
+      # worker 必须能跨租户扇出与汇总 → 用 BYPASSRLS 账号（见 deploy/init/01_roles.sql）
+      DATABASE_URL: postgresql://app_worker:${APP_WORKER_PASSWORD:-app_worker_password}@db:5432/${POSTGRES_DB:-competitor}
+    volumes:
+      - rawdata:/data/raw
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  rawdata:

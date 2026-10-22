@@ -1,0 +1,99 @@
+<div class="drawer-head">
+  <span class="badge {% if row.priority == 'P0' %}p0{% elif row.priority == 'P1' %}p1{% else %}p2{% endif %}">{{ row.priority }}</span>
+  <span class="badge {% if row.kind == 'A_info' %}brand{% else %}muted{% endif %}">
+    {% if row.kind == 'A_info' %}信息类{% elif row.kind == 'B_promo' %}跟价类{% else %}事实卡{% endif %}
+  </span>
+  <span class="badge muted">{{ row.get_status_display }}</span>
+  <div class="spacer"></div>
+  <button class="btn btn-sm btn-ghost" onclick="closeDrawer()">关闭 ✕</button>
+</div>
+
+<div class="drawer-body">
+  {% if error %}<div class="alert-error">{{ error }}</div>{% endif %}
+
+  <h3 style="font-size:14px;margin-bottom:8px">结论</h3>
+  <p style="margin:0 0 14px;font-size:13.5px">{{ card.conclusion }}</p>
+
+  <h3 style="font-size:13px;margin:0 0 6px">证据</h3>
+  {% for e in card.evidence %}
+    <div class="evidence" style="margin-bottom:6px">
+      <span class="id">{{ e.snapshot_evidence_id }} · {{ e.captured_at|slice:":16" }}</span>
+      {{ e.quote }}
+    </div>
+  {% empty %}
+    <div class="hint">无证据（降级卡）</div>
+  {% endfor %}
+
+  <div class="sep"></div>
+
+  <dl class="kv">
+    <dt>执行动作</dt><dd>{{ card.action }}</dd>
+    <dt>责任人</dt><dd>{{ card.owner_role }}</dd>
+    <dt>截止时间</dt><dd class="mono">{{ card.deadline|slice:":16" }}</dd>
+    <dt>预期影响</dt><dd>{{ card.expected_impact }}</dd>
+    <dt>验收标准</dt><dd>{{ card.acceptance }}</dd>
+  </dl>
+
+  <div class="sep"></div>
+  <h3 style="font-size:13px;margin:0 0 8px">成本与毛利</h3>
+  {% if card.cost_risk.cost_missing %}
+    <div class="hint" style="color:var(--warn)">缺少成本数据，无法测算让利与打平销量。</div>
+  {% elif card.cost_risk.mode %}
+    <div class="hint">{{ card.cost_risk.note|default:"本条建议不涉及让利测算" }}</div>
+  {% else %}
+    <dl class="kv">
+      <dt>单件让利</dt><dd class="mono">¥{{ card.cost_risk.unit_concession|default:"—" }}</dd>
+      <dt>毛利率</dt>
+      <dd class="mono">{{ card.cost_risk.margin_before|default:"—" }} → {{ card.cost_risk.margin_after|default:"—" }}
+        <span class="muted small">（底线 {{ card.cost_risk.margin_floor }}）</span></dd>
+      <dt>打平销量</dt>
+      <dd>{% if card.cost_risk.breakeven_volume_ratio %}<b>{{ card.cost_risk.breakeven_volume_ratio }} 倍</b>{% else %}—{% endif %}</dd>
+    </dl>
+    {% if card.cost_risk.below_floor %}
+      <div class="mt8"><span class="badge p0">跟价后跌破毛利底线</span></div>
+    {% endif %}
+  {% endif %}
+
+  {% if card.violations %}
+    <div class="mt12"><span class="badge p0">文案命中绝对化用语</span>
+      <span class="hint">{{ card.violations|join:"、" }}</span>
+    </div>
+  {% endif %}
+
+  {% if analysis %}
+    <div class="sep"></div>
+    <h3 style="font-size:13px;margin:0 0 8px">归因与置信度</h3>
+    <dl class="kv">
+      <dt>归因</dt><dd>{{ analysis.attribution|default:"—" }}</dd>
+      <dt>威胁等级</dt><dd>{{ analysis.threat_level|default:"—" }}</dd>
+      <dt>置信度</dt><dd class="mono">{{ analysis.confidence|default:"—" }}</dd>
+      <dt>模型</dt><dd class="mono small">{{ analysis.model_meta.model|default:"rules" }} · {{ analysis.model_meta.prompt_version|default:"—" }}</dd>
+    </dl>
+    {% if analysis.degraded %}
+      <div class="mt8 hint" style="color:var(--warn)">本条为降级输出：只报事实，不给归因结论。</div>
+    {% endif %}
+  {% endif %}
+</div>
+
+{% if row.status == 'pending' and user.can_write %}
+<div class="drawer-foot">
+  <form hx-post="/suggestions/{{ row.id }}/accept" hx-swap="none" style="margin:0">
+    {% csrf_token %}
+    <button class="btn btn-primary" type="submit">采纳并转任务</button>
+  </form>
+
+  <form hx-post="/suggestions/{{ row.id }}/ignore" hx-swap="none" class="flex" style="margin:0;gap:6px">
+    {% csrf_token %}
+    <select name="reason_tag" style="width:130px;height:32px">
+      {% for tag in reason_tags %}<option value="{{ tag }}">{{ tag }}</option>{% endfor %}
+    </select>
+    <input type="text" name="note" placeholder="备注（可选）" style="width:130px;height:32px">
+    <button class="btn" type="submit">忽略</button>
+  </form>
+
+  <form hx-post="/suggestions/{{ row.id }}/false-positive" hx-swap="none" style="margin:0 0 0 auto">
+    {% csrf_token %}
+    <button class="btn btn-danger" type="submit">标为误报</button>
+  </form>
+</div>
+{% endif %}
