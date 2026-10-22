@@ -26,7 +26,9 @@ __all__ = ["Worker"]
 
 log = get_logger("worker")
 
-SCHEDULE_TICK_SECONDS = 10
+#: 调度 tick 间隔。最短采集间隔是 120 分钟（core），10 秒一次纯属给 job 表刷无意义的行
+#: （8640 行/天）。60 秒足够准时，也把这类噪音降到 1/6。
+SCHEDULE_TICK_SECONDS = 60
 PERIODIC_INTERVAL_S = 60
 
 
