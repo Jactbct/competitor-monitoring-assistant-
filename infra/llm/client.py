@@ -188,8 +188,22 @@ class OpenAiCompatibleLlm:
                 if response.status_code == 429:
                     raise LlmError(f"限流 429（Retry-After={response.headers.get('retry-after')}）")
                 if response.status_code >= 400:
-                    # 401/403/400（key 错、模型名错、不支持 JSON 模式）重试只会放大故障
-                    raise _FatalLlmError(f"请求被拒绝 {response.status_code}: {response.text[:200]}")
+                    snippet = response.text[:400]
+                    # 部分第三方网关不支持 response_format（OpenAI 兼容但不完整）：
+                    # 报 400 且提到 response_format 时，去掉这个字段重试一次。
+                    # 这是唯一值得对 4xx 重试的情况 —— 换的是请求形状，不是原样重撞。
+                    if (
+                        response.status_code == 400
+                        and "response_format" in snippet
+                        and "response_format" in payload
+                    ):
+                        payload.pop("response_format", None)
+                        log.info("llm.retry_without_response_format", extra={"node": node})
+                        raise LlmError("上游不支持 response_format，已改用提示词约束重试")
+                    # 401/403（key 错）、404（base_url 或模型名错）重试只会放大故障
+                    raise _FatalLlmError(
+                        f"请求被拒绝 {response.status_code}: {snippet[:200]}"
+                    )
                 body = response.json()
                 content = body["choices"][0]["message"]["content"]
                 data = json.loads(_FENCE_RE.sub("", content).strip())

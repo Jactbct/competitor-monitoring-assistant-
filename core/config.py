@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -175,6 +176,21 @@ class LlmSettings:
     daily_token_quota: int = 2_000_000
     cache_ttl_days: int = 30
 
+    @staticmethod
+    def normalize_base_url(raw: str) -> str:
+        """把用户粘贴的地址统一成「base」形式。
+
+        供应商文档常给完整 endpoint（``https://host/v1/chat/completions``），
+        而客户端会自己拼 ``/chat/completions``。不归一化就会请求成
+        ``.../chat/completions/chat/completions`` —— 401/404 之后很难看出原因。
+        """
+        url = (raw or "").strip().rstrip("/")
+        for suffix in ("/chat/completions", "/completions", "/v1/chat/completions"):
+            if url.endswith(suffix):
+                url = url[: -len(suffix)]
+                break
+        return url.rstrip("/")
+
     @property
     def enabled(self) -> bool:
         return self.mode == "openai" and bool(self.api_key)
@@ -182,8 +198,13 @@ class LlmSettings:
     def validate(self) -> None:
         if self.mode not in {"off", "openai"}:
             raise ConfigError(f"LLM_MODE 只能是 off/openai，实际为 {self.mode!r}")
+        # 这里刻意**不**抛错：模型是软依赖。缺 Key 时整条链路会确定性降级到规则引擎
+        # （卡片照样生成，只是归因粒度粗）。如果在这里 fail-fast，一个还没填 Key 的
+        # .env 会让登录页都打不开，属于「配置没填好 → 全站不可用」的错误取舍。
         if self.mode == "openai" and not self.api_key:
-            raise ConfigError("LLM_MODE=openai 时必须提供 LLM_API_KEY")
+            logging.getLogger("config").warning(
+                "LLM_MODE=openai 但 LLM_API_KEY 为空：模型调用将降级为规则模式（运行 manage.py llm_check 查看详情）"
+            )
 
 
 @dataclass(frozen=True)
@@ -251,7 +272,7 @@ def _build(project_root: Path) -> Settings:
 
     llm = LlmSettings(
         mode=_str("LLM_MODE", "off"),
-        base_url=_str("LLM_BASE_URL", ""),
+        base_url=LlmSettings.normalize_base_url(_str("LLM_BASE_URL", "")),
         api_key=_str("LLM_API_KEY", ""),
         model_extract=_str("LLM_MODEL_EXTRACT", "small"),
         model_reason=_str("LLM_MODEL_REASON", "mid"),

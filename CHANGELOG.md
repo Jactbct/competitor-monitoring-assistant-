@@ -2,6 +2,37 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与语义化版本。
 
+## [0.3.1] - 2026-10-22
+
+接入自有模型网关（OpenAI 兼容），并修掉「配置没填好就全站不可用」的取舍错误。
+
+### Added
+
+- `manage.py llm_check`：打印当前 base_url / Key 长度 / 模型名，`--list-models` 列该 Key 可用模型，
+  默认真调一次并输出 tokens 与成本；401/403/404/429/超时各有对应中文提示
+- 客户端兼容不支持 `response_format` 的网关：收到 400 且点名该字段时，去掉后重试一次
+  （这是唯一值得对 4xx 重试的情况——换的是请求形状，不是原样重撞）
+- `.env` 本地模板（含 `LLM_BASE_URL` / 模型名占位，Key 留空）；`.env` 已在 .gitignore
+
+### Fixed
+
+- `LLM_BASE_URL` 若粘贴完整 endpoint（`https://host/v1/chat/completions`）会拼成
+  `.../chat/completions/chat/completions` → 新增 `normalize_base_url()` 归一化
+- **`LLM_MODE=openai` 但 Key 未填时，配置校验直接抛错导致连登录页都打不开**。
+  模型是软依赖（有确定性降级路径），改为「降级 + 明确告警」；
+  硬依赖（密钥/数据库）仍然 fail-fast。同时 `manage.py` 捕获配置错误只打一行提示，不甩 traceback
+- 本地 `.env` 指向 `app_rw` 会让 `pytest` 因「无建库权限」失败 → 本地默认 owner 连接，
+  生产 compose 仍用 `app_rw`（隔离验收脚本单独跑）
+
+### Verified
+
+| 项 | 结果 |
+|---|---|
+| `ruff check .` | All checks passed |
+| 测试（PG 16.15） | 244 passed |
+| `manage.py llm_check`（未填 Key） | 明确提示「LLM_API_KEY 为空 + 该改哪个文件」，退出码非 0 |
+| 地址归一化 / response_format 降级 / 401 不重试 | 9 条单测 |
+
 ## [0.3.0] - 2026-10-22
 
 补齐最后一环：**建议采纳后的 T+7 效果回看**，并补上仓库与浏览器 E2E。

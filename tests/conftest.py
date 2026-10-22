@@ -2,7 +2,8 @@
 
 约定：
 * 价格类断言一律用 Decimal，不用 float；
-* 每个涉及租户的测试都显式建租户，避免默认管理器因无上下文返回 0 行造成「假绿」。
+* 每个涉及租户的测试都显式建租户，避免默认管理器因无上下文返回 0 行造成「假绿」；
+* 默认跑 SQLite；要跑 PG 用 ``PG_TESTS=1 DATABASE_URL=postgresql://postgres:... pytest``。
 """
 
 from __future__ import annotations

@@ -136,6 +136,23 @@ python scripts/e2e_browser.py                # 8 步，截图落到 .data/e2e/
 | 浏览器 E2E | 8/8（登录/抽屉/采纳/任务/详情/平台视图/403） | `scripts/e2e_browser.py`、`docs/screenshots/` |
 | 效果回看 | 采纳→T+7 四分支（回涨/维持/下探/取不到价） | `tests/integration/test_outcome.py` |
 
+## 接上自己的模型（三步）
+
+```bash
+# 1) 填 Key：打开项目根目录的 .env，把这一行补上（不要引号、不要空格）
+#    LLM_API_KEY=sk-xxxx
+# 2) 看这个 Key 能用哪些模型（模型名填错是最常见的 404 来源）
+python manage.py llm_check --list-models
+# 3) 真实调用一次，验证 JSON 输出与用量记账
+python manage.py llm_check --model <把上一步看到的模型名填这里>
+```
+
+`LLM_BASE_URL` 可以直接粘供应商给的完整 endpoint（`https://host/v1/chat/completions`），
+会自动归一化成 base；网关不支持 `response_format` 时客户端会自动去掉该字段重试一次。
+
+失败对照：401/403 → Key 或权限；404 → base_url 少了 `/v1` 或模型名不存在；
+400 提到 `response_format` → 网关不完整支持 JSON 模式（已自动降级重试）；超时 → 调 `LLM_TIMEOUT_S`。
+
 ## 生产部署
 
 ```bash
